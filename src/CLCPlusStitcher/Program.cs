@@ -21,7 +21,7 @@ namespace CLCPlusStitcher
 
 	public class Program
 	{
-		public static async Task Main()
+		public static void Main()
 		{
 			IConfigurationBuilder builder = new ConfigurationBuilder().AddJsonFile("appsettings.json");
 
