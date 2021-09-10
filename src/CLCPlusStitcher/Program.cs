@@ -21,7 +21,7 @@ namespace CLCPlusStitcher
 
 	public class Program
 	{
-		public static void Main()
+		public static async Task Main()
 		{
 			IConfigurationBuilder builder = new ConfigurationBuilder().AddJsonFile("appsettings.json");
 
@@ -48,25 +48,48 @@ namespace CLCPlusStitcher
 			IConfigurationSection pu1Section = config.GetSection("PU1");
 			Input pu1Input = pu1Section.GetSection("Input").Get<Input>();
 
-			Polygon pu1Aoi = provider.LoadFromFile<Polygon>(pu1Section.GetSection("AOI").Get<Input>(), precisionModel).Buffer(0).Execute().First();
+			Polygon pu1Aoi = provider.LoadFromFile<Polygon>(pu1Section.GetSection("AOI").Get<Input>(), precisionModel)
+				.Buffer(0)
+				.Execute()
+				.First();
 			IProcessor<Polygon> pu1Processor = provider.LoadFromFile<Polygon>(pu1Input, precisionModel,
-				provider.GetRequiredService<ILogger<Processor>>()).Buffer(0).Intersect(pu1Aoi);
+					provider.GetRequiredService<ILogger<Processor>>())
+				.Buffer(0)
+				.Intersect(pu1Aoi);
 
 			IConfigurationSection pu2Section = config.GetSection("PU2");
 			Input pu2Input = pu2Section.GetSection("Input").Get<Input>();
 
-			Polygon pu2Aoi = provider.LoadFromFile<Polygon>(pu2Section.GetSection("AOI").Get<Input>(), precisionModel).Buffer(0).Execute().First();
+			Polygon pu2Aoi = provider.LoadFromFile<Polygon>(pu2Section.GetSection("AOI").Get<Input>(), precisionModel)
+				.Buffer(0)
+				.Execute()
+				.First();
 			IProcessor<Polygon> pu2Processor = provider.LoadFromFile<Polygon>(pu2Input, precisionModel,
-				provider.GetRequiredService<ILogger<Processor>>()).Buffer(0).Intersect(pu2Aoi);
+					provider.GetRequiredService<ILogger<Processor>>())
+				.Buffer(0)
+				.Intersect(pu2Aoi);
 
 			// Find duplicates and remove from PU2
 			// TODO: Maybe use a buffered common border?
 			////Geometry commonBorder = pu1Aoi.Intersection(pu2Aoi);
-			ICollection<Polygon> pu2Intersects = pu2Processor.Execute();
-			ICollection<Polygon> pu1BorderPolygons = pu1Processor.Overlap(pu1Aoi).Execute();
-			ICollection<Polygon> pu2BorderPolygons = pu2Processor.Overlap(pu2Aoi).Execute();
+			Task<ICollection<Polygon>>? task5 = Task.Run(() => pu1Processor.Execute());
+			Task<ICollection<Polygon>>? task6 = Task.Run(() => pu2Processor.Execute());
+
+			await Task.WhenAll(task5, task6);
+
+			ICollection<Polygon> pu1Intersects = task5.Result;
+			ICollection<Polygon> pu2Intersects = task6.Result;
+
+			Task<ICollection<Polygon>>? task1 = Task.Run(() => pu1Processor.Overlap(pu1Aoi).Execute());
+			Task<ICollection<Polygon>>? task2 = Task.Run(() => pu2Processor.Overlap(pu2Aoi).Execute());
+
+			await Task.WhenAll(task1, task2);
+
+			ICollection<Polygon> pu1BorderPolygons = task1.Result;
+			ICollection<Polygon> pu2BorderPolygons = task2.Result;
 
 			int i = 0;
+
 			foreach (var pu1BorderPolygon in pu1BorderPolygons)
 			{
 				Polygon? polygon = pu2BorderPolygons.FirstOrDefault(x => x.EqualsTopologically(pu1BorderPolygon));
@@ -81,8 +104,11 @@ namespace CLCPlusStitcher
 			logger.LogInformation($"Remove duplicates: {i} polygons removed from PU2");
 
 			// Export output PU1 and PU2
-			pu1Processor.Execute().Save(pu1Section.GetSection("Output").Get<Input>().FileName, precisionModel);
-			pu2Intersects.Save(pu2Section.GetSection("Output").Get<Input>().FileName, precisionModel);
+			Task? task3 = Task.Run(() => pu1Intersects.Save(pu1Section.GetSection("Output").Get<Input>().FileName, precisionModel));
+			Task? task4 = Task.Run(() => pu2Intersects.Save(pu2Section.GetSection("Output").Get<Input>().FileName, precisionModel));
+
+			await Task.WhenAll(task3, task4);
+
 			logger.LogInformation("Saved PU outputs");
 
 			stopwatch.Stop();
