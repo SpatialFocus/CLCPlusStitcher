@@ -21,7 +21,7 @@ jobs:
     - name: Build
       run: dotnet build --configuration Release --no-restore
     - name: Publish
-      run: dotnet publish ./src/ClcPlusStitcher/ClcPlusStitcher.csproj --configuration Release --output ./publish --runtime win-x64  --self-contained true -p:PublishTrimmed=true -p:PublishSingleFile=true
+      run: dotnet publish ./src/CLCPlusStitcher/CLCPlusStitcher.csproj --configuration Release --output ./publish --runtime win-x64  --self-contained true -p:PublishTrimmed=true -p:PublishSingleFile=true
     - name: Get Release Number
       run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
     - name: Zip publish result
