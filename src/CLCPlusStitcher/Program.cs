@@ -48,7 +48,7 @@ namespace CLCPlusStitcher
 			IConfigurationSection pu1Section = config.GetSection("PU1");
 			Input pu1Input = pu1Section.GetSection("Input").Get<Input>();
 
-			Polygon pu1Aoi = provider.LoadFromFile<Polygon>(pu1Section.GetSection("AOI").Get<Input>(), precisionModel)
+			MultiPolygon pu1Aoi = provider.LoadFromFile<MultiPolygon>(pu1Section.GetSection("AOI").Get<Input>(), precisionModel)
 				.Buffer(0)
 				.Execute()
 				.First();
@@ -60,7 +60,7 @@ namespace CLCPlusStitcher
 			IConfigurationSection pu2Section = config.GetSection("PU2");
 			Input pu2Input = pu2Section.GetSection("Input").Get<Input>();
 
-			Polygon pu2Aoi = provider.LoadFromFile<Polygon>(pu2Section.GetSection("AOI").Get<Input>(), precisionModel)
+			MultiPolygon pu2Aoi = provider.LoadFromFile<MultiPolygon>(pu2Section.GetSection("AOI").Get<Input>(), precisionModel)
 				.Buffer(0)
 				.Execute()
 				.First();
