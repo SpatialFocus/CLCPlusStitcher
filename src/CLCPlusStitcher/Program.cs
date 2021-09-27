@@ -100,13 +100,13 @@ namespace CLCPlusStitcher
 					}
 				}
 
-				logger.LogInformation($"Remove duplicates: {i} polygons removed from PU2");
+				logger.LogInformation($"Stitching: {i} duplicated polygons removed from PU2");
 			}
 			else
 			{
-				Geometry commonBorder = pu1Aoi.Intersection(pu2Aoi);
-				IProcessor<Polygon> pu1CrossesCommonBorder = pu1Processor.Crosses(commonBorder);
-				IProcessor<Polygon> pu2CrossesCommonBorder = pu2Processor.Crosses(commonBorder);
+				////Geometry commonBorder = pu1Aoi.Intersection(pu2Aoi);
+				IProcessor<Polygon> pu1CrossesCommonBorder = pu1Processor.Overlap(pu1Aoi);
+				IProcessor<Polygon> pu2CrossesCommonBorder = pu2Processor.Overlap(pu2Aoi);
 				List<Polygon> pu1Polygons = pu1CrossesCommonBorder.Execute().ToList();
 				List<Polygon> pu2Polygons = pu2CrossesCommonBorder.Execute().ToList();
 				List<Polygon> pu1PolygonsResults = new();
@@ -114,7 +114,9 @@ namespace CLCPlusStitcher
 
 				foreach (Polygon pu1Polygon in pu1Polygons)
 				{
-					List<Polygon> polygons = pu2Polygons.Where(x => x.Relate(pu1Polygon)[Location.Interior, Location.Interior] == Dimension.Surface).ToList();
+					List<Polygon> polygons = pu2Polygons
+						.Where(x => x.Relate(pu1Polygon)[Location.Interior, Location.Interior] == Dimension.Surface)
+						.ToList();
 
 					if (polygons.Any())
 					{
@@ -130,7 +132,8 @@ namespace CLCPlusStitcher
 					}
 					else
 					{
-						Polygon? result = pu1PolygonsResults.FirstOrDefault(x => x.Relate(pu1Polygon)[Location.Interior, Location.Interior] == Dimension.Surface);
+						Polygon? result = pu1PolygonsResults.FirstOrDefault(x =>
+							x.Relate(pu1Polygon)[Location.Interior, Location.Interior] == Dimension.Surface);
 
 						if (result != null)
 						{
@@ -169,7 +172,8 @@ namespace CLCPlusStitcher
 					pu2Intersects.Add(polygon);
 				}
 
-				logger.LogInformation($"Remove duplicates: {pu2CrossesCommonBorder.Execute().Count} polygons removed from PU2");
+				logger.LogInformation($"Stitching: {pu1PolygonsResults.Count} polygons merged into PU1");
+				logger.LogInformation($"Stitching: {pu2CrossesCommonBorder.Execute().Count - pu2Polygons.Count} polygons removed from PU2");
 			}
 
 			// Export output PU1 and PU2
