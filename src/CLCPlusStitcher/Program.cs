@@ -69,9 +69,6 @@ namespace CLCPlusStitcher
 				.Buffer(0)
 				.Intersect(pu2Aoi);
 
-			// Find duplicates and remove from PU2
-			// TODO: Maybe use a buffered common border?
-			////Geometry commonBorder = pu1Aoi.Intersection(pu2Aoi);
 			Task<ICollection<Polygon>>? task5 = Task.Run(() => pu1Processor.Execute());
 			Task<ICollection<Polygon>>? task6 = Task.Run(() => pu2Processor.Execute());
 
@@ -80,28 +77,100 @@ namespace CLCPlusStitcher
 			ICollection<Polygon> pu1Intersects = task5.Result;
 			ICollection<Polygon> pu2Intersects = task6.Result;
 
-			Task<ICollection<Polygon>>? task1 = Task.Run(() => pu1Processor.Overlap(pu1Aoi).Execute());
-			Task<ICollection<Polygon>>? task2 = Task.Run(() => pu2Processor.Overlap(pu2Aoi).Execute());
-
-			await Task.WhenAll(task1, task2);
-
-			ICollection<Polygon> pu1BorderPolygons = task1.Result;
-			ICollection<Polygon> pu2BorderPolygons = task2.Result;
-
-			int i = 0;
-
-			foreach (var pu1BorderPolygon in pu1BorderPolygons)
+			if (bool.Parse(config["CompareTopologicalEquality"]))
 			{
-				Polygon? polygon = pu2BorderPolygons.FirstOrDefault(x => x.EqualsTopologically(pu1BorderPolygon));
+				Task<ICollection<Polygon>>? task1 = Task.Run(() => pu1Processor.Overlap(pu1Aoi).Execute());
+				Task<ICollection<Polygon>>? task2 = Task.Run(() => pu2Processor.Overlap(pu2Aoi).Execute());
 
-				if (polygon != null)
+				await Task.WhenAll(task1, task2);
+
+				ICollection<Polygon> pu1BorderPolygons = task1.Result;
+				ICollection<Polygon> pu2BorderPolygons = task2.Result;
+
+				int i = 0;
+
+				foreach (var pu1BorderPolygon in pu1BorderPolygons)
+				{
+					Polygon? polygon = pu2BorderPolygons.FirstOrDefault(x => x.EqualsTopologically(pu1BorderPolygon));
+
+					if (polygon != null)
+					{
+						pu2Intersects.Remove(polygon);
+						i++;
+					}
+				}
+
+				logger.LogInformation($"Remove duplicates: {i} polygons removed from PU2");
+			}
+			else
+			{
+				Geometry commonBorder = pu1Aoi.Intersection(pu2Aoi);
+				IProcessor<Polygon> pu1CrossesCommonBorder = pu1Processor.Crosses(commonBorder);
+				IProcessor<Polygon> pu2CrossesCommonBorder = pu2Processor.Crosses(commonBorder);
+				List<Polygon> pu1Polygons = pu1CrossesCommonBorder.Execute().ToList();
+				List<Polygon> pu2Polygons = pu2CrossesCommonBorder.Execute().ToList();
+				List<Polygon> pu1PolygonsResults = new();
+				List<Polygon> pu1PolygonsRemaining = new();
+
+				foreach (Polygon pu1Polygon in pu1Polygons)
+				{
+					List<Polygon> polygons = pu2Polygons.Where(x => x.Relate(pu1Polygon)[Location.Interior, Location.Interior] == Dimension.Surface).ToList();
+
+					if (polygons.Any())
+					{
+						Polygon result = pu1Polygon;
+
+						foreach (Polygon polygon in polygons)
+						{
+							result = (Polygon)result.Union(polygon);
+							pu2Polygons.Remove(polygon);
+						}
+
+						pu1PolygonsResults.Add(result);
+					}
+					else
+					{
+						Polygon? result = pu1PolygonsResults.FirstOrDefault(x => x.Relate(pu1Polygon)[Location.Interior, Location.Interior] == Dimension.Surface);
+
+						if (result != null)
+						{
+							pu1PolygonsResults.Remove(result);
+							pu1PolygonsResults.Add((Polygon)result.Union(pu1Polygon));
+						}
+						else
+						{
+							pu1PolygonsRemaining.Add(pu1Polygon);
+						}
+					}
+				}
+
+				foreach (Polygon polygon in pu1CrossesCommonBorder.Execute())
+				{
+					pu1Intersects.Remove(polygon);
+				}
+
+				foreach (Polygon polygon in pu2CrossesCommonBorder.Execute())
 				{
 					pu2Intersects.Remove(polygon);
-					i++;
 				}
-			}
 
-			logger.LogInformation($"Remove duplicates: {i} polygons removed from PU2");
+				foreach (Polygon polygon in pu1PolygonsResults)
+				{
+					pu1Intersects.Add(polygon);
+				}
+
+				foreach (Polygon polygon in pu1PolygonsRemaining)
+				{
+					pu1Intersects.Add(polygon);
+				}
+
+				foreach (Polygon polygon in pu2Polygons)
+				{
+					pu2Intersects.Add(polygon);
+				}
+
+				logger.LogInformation($"Remove duplicates: {pu2CrossesCommonBorder.Execute().Count} polygons removed from PU2");
+			}
 
 			// Export output PU1 and PU2
 			Task? task3 = Task.Run(() => pu1Intersects.Save(pu1Section.GetSection("Output").Get<Input>().FileName, precisionModel));
