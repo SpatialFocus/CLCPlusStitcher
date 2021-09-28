@@ -104,11 +104,10 @@ namespace CLCPlusStitcher
 			}
 			else
 			{
-				////Geometry commonBorder = pu1Aoi.Intersection(pu2Aoi);
-				IProcessor<Polygon> pu1CrossesCommonBorder = pu1Processor.Overlap(pu1Aoi);
-				IProcessor<Polygon> pu2CrossesCommonBorder = pu2Processor.Overlap(pu2Aoi);
-				List<Polygon> pu1Polygons = pu1CrossesCommonBorder.Execute().ToList();
-				List<Polygon> pu2Polygons = pu2CrossesCommonBorder.Execute().ToList();
+				IProcessor<Polygon> pu1OverlapsAoi = pu1Processor.Overlap(pu1Aoi);
+				IProcessor<Polygon> pu2OverlapsAoi = pu2Processor.Overlap(pu2Aoi);
+				List<Polygon> pu1Polygons = pu1OverlapsAoi.Execute().ToList();
+				List<Polygon> pu2Polygons = pu2OverlapsAoi.Execute().ToList();
 				List<Polygon> pu1PolygonsResults = new();
 				List<Polygon> pu1PolygonsRemaining = new();
 
@@ -147,12 +146,12 @@ namespace CLCPlusStitcher
 					}
 				}
 
-				foreach (Polygon polygon in pu1CrossesCommonBorder.Execute())
+				foreach (Polygon polygon in pu1OverlapsAoi.Execute())
 				{
 					pu1Intersects.Remove(polygon);
 				}
 
-				foreach (Polygon polygon in pu2CrossesCommonBorder.Execute())
+				foreach (Polygon polygon in pu2OverlapsAoi.Execute())
 				{
 					pu2Intersects.Remove(polygon);
 				}
@@ -173,12 +172,14 @@ namespace CLCPlusStitcher
 				}
 
 				logger.LogInformation($"Stitching: {pu1PolygonsResults.Count} polygons merged into PU1");
-				logger.LogInformation($"Stitching: {pu2CrossesCommonBorder.Execute().Count - pu2Polygons.Count} polygons removed from PU2");
+				logger.LogInformation($"Stitching: {pu2OverlapsAoi.Execute().Count - pu2Polygons.Count} polygons removed from PU2");
 			}
 
 			// Export output PU1 and PU2
-			Task? task3 = Task.Run(() => pu1Intersects.Save(pu1Section.GetSection("Output").Get<Input>().FileName, precisionModel));
-			Task? task4 = Task.Run(() => pu2Intersects.Save(pu2Section.GetSection("Output").Get<Input>().FileName, precisionModel));
+			Input pu1Output = pu1Section.GetSection("Output").Get<Input>();
+			Input pu2Output = pu2Section.GetSection("Output").Get<Input>();
+			Task? task3 = Task.Run(() => pu1Intersects.Save(pu1Output.FileName, precisionModel, layerName: pu1Output.LayerName));
+			Task? task4 = Task.Run(() => pu2Intersects.Save(pu2Output.FileName, precisionModel, layerName: pu2Output.LayerName));
 
 			await Task.WhenAll(task3, task4);
 
