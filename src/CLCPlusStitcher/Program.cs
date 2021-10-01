@@ -7,6 +7,7 @@ namespace CLCPlusStitcher
 	using System;
 	using System.Collections.Generic;
 	using System.Diagnostics;
+	using System.IO;
 	using System.Linq;
 	using System.Threading.Tasks;
 	using ClcPlusRetransformer.Core;
@@ -119,30 +120,61 @@ namespace CLCPlusStitcher
 
 					if (polygons.Any())
 					{
-						Polygon result = pu1Polygon;
+						Geometry geometry = pu1Polygon.Intersection(pu1Aoi);
+						Geometry multiPolygonPu1 = new MultiPolygon(geometry.FlattenAndIgnore<Polygon>().Where(x => x.Area > 1).ToArray());
+						//Polygon result = (Polygon)geometry;
 
 						foreach (Polygon polygon in polygons)
 						{
-							result = (Polygon)result.Union(polygon);
+							Geometry intersection = polygon.Intersection(pu2Aoi);
+
+							MultiPolygon multiPolygon = new(intersection.FlattenAndIgnore<Polygon>().Where(x => x.Area > 1).ToArray());
+
+							multiPolygonPu1 = multiPolygonPu1.Union(multiPolygon);
+
+							//result = (Polygon)union;
 							pu2Polygons.Remove(polygon);
 						}
 
-						pu1PolygonsResults.Add(result);
-					}
-					else
-					{
-						Polygon? result = pu1PolygonsResults.FirstOrDefault(x =>
-							x.Relate(pu1Polygon)[Location.Interior, Location.Interior] == Dimension.Surface);
-
-						if (result != null)
+						if (multiPolygonPu1 is Polygon)
 						{
-							pu1PolygonsResults.Remove(result);
-							pu1PolygonsResults.Add((Polygon)result.Union(pu1Polygon));
+							pu1PolygonsResults.Add((Polygon)multiPolygonPu1);
+						}
+						else if (multiPolygonPu1 is MultiPolygon && multiPolygonPu1.FlattenAndIgnore<Polygon>().Count() == 1)
+						{
+							pu1PolygonsResults.Add(multiPolygonPu1.FlattenAndIgnore<Polygon>().First());
 						}
 						else
 						{
-							pu1PolygonsRemaining.Add(pu1Polygon);
+							File.WriteAllText(@$"C:\temp\multi_{DateTime.Now.Ticks}.txt", multiPolygonPu1.AsText());
+
+							pu1PolygonsResults.AddRange(multiPolygonPu1.FlattenAndIgnore<Polygon>().Where(x => x.Area > 1));
+
+							//multiPolygonPu1.Save(@"c:\temp\multipolygon.gpkg");
+							//throw new InvalidOperationException();
 						}
+
+						//pu1PolygonsResults.Add((Polygon)multiPolygonPu1);
+					}
+					else
+					{
+						//Polygon? result = pu1PolygonsResults.FirstOrDefault(x =>
+						//	x.Relate(pu1Polygon)[Location.Interior, Location.Interior] == Dimension.Surface);
+
+						//if (result != null)
+						//{
+						//	Geometry intersection = pu1Polygon.Intersection(pu2Aoi);
+
+						//	result = (Polygon)result.Union(intersection);
+						//	pu1PolygonsResults.Add((Polygon)result.Union(pu1Polygon));
+
+						//	pu1PolygonsResults.Remove(result);
+						//}
+						//else
+						//{
+						pu1PolygonsRemaining.Add(pu1Polygon);
+
+						//}
 					}
 				}
 
