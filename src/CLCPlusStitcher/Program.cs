@@ -69,16 +69,18 @@ namespace CLCPlusStitcher
 				.Buffer(0)
 				.Intersect(pu2Aoi);
 
-			Task<ICollection<Polygon>>? task5 = Task.Run(() => pu1Processor.Execute());
-			Task<ICollection<Polygon>>? task6 = Task.Run(() => pu2Processor.Execute());
-
-			await Task.WhenAll(task5, task6);
-
-			ICollection<Polygon> pu1Intersects = task5.Result;
-			ICollection<Polygon> pu2Intersects = task6.Result;
+			ICollection<Polygon> pu1Polygons, pu2Polygons;
 
 			if (bool.Parse(config["CompareTopologicalEquality"]))
 			{
+				Task<ICollection<Polygon>>? task5 = Task.Run(() => pu1Processor.Execute());
+				Task<ICollection<Polygon>>? task6 = Task.Run(() => pu2Processor.Execute());
+
+				await Task.WhenAll(task5, task6);
+
+				pu1Polygons = task5.Result;
+				pu2Polygons = task6.Result;
+
 				Task<ICollection<Polygon>>? task1 = Task.Run(() => pu1Processor.Overlap(pu1Aoi).Execute());
 				Task<ICollection<Polygon>>? task2 = Task.Run(() => pu2Processor.Overlap(pu2Aoi).Execute());
 
@@ -95,7 +97,7 @@ namespace CLCPlusStitcher
 
 					if (polygon != null)
 					{
-						pu2Intersects.Remove(polygon);
+						pu2Polygons.Remove(polygon);
 						i++;
 					}
 				}
@@ -104,82 +106,38 @@ namespace CLCPlusStitcher
 			}
 			else
 			{
+				IProcessor<Polygon> pu1ContainedInAoi = pu1Processor.Contains(pu1Aoi);
+				IProcessor<Polygon> pu2ContainedInAoi = pu2Processor.Contains(pu2Aoi);
+
 				IProcessor<Polygon> pu1OverlapsAoi = pu1Processor.Overlap(pu1Aoi);
 				IProcessor<Polygon> pu2OverlapsAoi = pu2Processor.Overlap(pu2Aoi);
-				List<Polygon> pu1Polygons = pu1OverlapsAoi.Execute().ToList();
-				List<Polygon> pu2Polygons = pu2OverlapsAoi.Execute().ToList();
-				List<Polygon> pu1PolygonsResults = new();
-				List<Polygon> pu1PolygonsRemaining = new();
 
-				foreach (Polygon pu1Polygon in pu1Polygons)
-				{
-					List<Polygon> polygons = pu2Polygons
-						.Where(x => x.Relate(pu1Polygon)[Location.Interior, Location.Interior] == Dimension.Surface)
-						.ToList();
+				IProcessor<LineString> pu1Lines = pu1OverlapsAoi.PolygonsToLines().Clip(pu1Aoi.Buffer(0.0001)).Dissolve();
+				IProcessor<LineString> pu2Lines = pu2OverlapsAoi.PolygonsToLines().Clip(pu2Aoi.Buffer(0.0001)).Dissolve();
 
-					if (polygons.Any())
-					{
-						Polygon result = pu1Polygon;
+				IProcessor<LineString> mergedLines = pu1Lines.SnapTo(pu2Lines.Execute(), 0.001)
+					.Merge(pu2Lines.Execute())
+					.Node(precisionModel)
+					.Union(provider.GetRequiredService<ILogger<Processor>>());
 
-						foreach (Polygon polygon in polygons)
-						{
-							result = (Polygon)result.Union(polygon);
-							pu2Polygons.Remove(polygon);
-						}
+				IProcessor<Polygon> polygonsOverlappingAoi = mergedLines.Polygonize().Overlap(pu1Aoi);
 
-						pu1PolygonsResults.Add(result);
-					}
-					else
-					{
-						Polygon? result = pu1PolygonsResults.FirstOrDefault(x =>
-							x.Relate(pu1Polygon)[Location.Interior, Location.Interior] == Dimension.Surface);
+				IProcessor<Polygon> pu1Merge = pu1ContainedInAoi.Merge(polygonsOverlappingAoi.Execute());
 
-						if (result != null)
-						{
-							pu1PolygonsResults.Remove(result);
-							pu1PolygonsResults.Add((Polygon)result.Union(pu1Polygon));
-						}
-						else
-						{
-							pu1PolygonsRemaining.Add(pu1Polygon);
-						}
-					}
-				}
+				IProcessor<Polygon> pu1WithFilledGaps =
+					pu1Merge.FillGaps(pu1OverlapsAoi.Execute(), null, provider.GetRequiredService<ILogger<Processor>>());
+				pu1Polygons = pu1WithFilledGaps.Execute();
 
-				foreach (Polygon polygon in pu1OverlapsAoi.Execute())
-				{
-					pu1Intersects.Remove(polygon);
-				}
-
-				foreach (Polygon polygon in pu2OverlapsAoi.Execute())
-				{
-					pu2Intersects.Remove(polygon);
-				}
-
-				foreach (Polygon polygon in pu1PolygonsResults)
-				{
-					pu1Intersects.Add(polygon);
-				}
-
-				foreach (Polygon polygon in pu1PolygonsRemaining)
-				{
-					pu1Intersects.Add(polygon);
-				}
-
-				foreach (Polygon polygon in pu2Polygons)
-				{
-					pu2Intersects.Add(polygon);
-				}
-
-				logger.LogInformation($"Stitching: {pu1PolygonsResults.Count} polygons merged into PU1");
-				logger.LogInformation($"Stitching: {pu2OverlapsAoi.Execute().Count - pu2Polygons.Count} polygons removed from PU2");
+				IProcessor<Polygon> filledGapsPu2 = pu2ContainedInAoi.FillGaps(pu2OverlapsAoi.Execute(), polygonsOverlappingAoi.Execute(),
+					provider.GetRequiredService<ILogger<Processor>>());
+				pu2Polygons = filledGapsPu2.Execute();
 			}
 
 			// Export output PU1 and PU2
 			Input pu1Output = pu1Section.GetSection("Output").Get<Input>();
 			Input pu2Output = pu2Section.GetSection("Output").Get<Input>();
-			Task? task3 = Task.Run(() => pu1Intersects.Save(pu1Output.FileName, precisionModel, layerName: pu1Output.LayerName));
-			Task? task4 = Task.Run(() => pu2Intersects.Save(pu2Output.FileName, precisionModel, layerName: pu2Output.LayerName));
+			Task? task3 = Task.Run(() => pu1Polygons.Save(pu1Output.FileName, precisionModel, layerName: pu1Output.LayerName));
+			Task? task4 = Task.Run(() => pu2Polygons.Save(pu2Output.FileName, precisionModel, layerName: pu2Output.LayerName));
 
 			await Task.WhenAll(task3, task4);
 
