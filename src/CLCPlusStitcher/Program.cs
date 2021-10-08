@@ -120,17 +120,21 @@ namespace CLCPlusStitcher
 					.Node(precisionModel)
 					.Union(provider.GetRequiredService<ILogger<Processor>>());
 
+				// Construct polygons that are shared between PU1 and PU2
 				IProcessor<Polygon> polygonsOverlappingAoi = mergedLines.Polygonize().Overlap(pu1Aoi);
 
+				// Merge them into PU1
 				IProcessor<Polygon> pu1Merge = pu1ContainedInAoi.Merge(polygonsOverlappingAoi.Execute());
 
-				IProcessor<Polygon> pu1WithFilledGaps =
-					pu1Merge.FillGaps(pu1OverlapsAoi.Execute(), null, provider.GetRequiredService<ILogger<Processor>>());
+				// Fill the gaps of PU1 with border polygons that have not been shared with PU2
+				IProcessor<Polygon> pu1WithFilledGaps = pu1Merge.FillGaps(pu1OverlapsAoi.Execute(), polygonsOverlappingAoi.Execute(),
+					provider.GetRequiredService<ILogger<Processor>>());
 				pu1Polygons = pu1WithFilledGaps.Execute();
 
-				IProcessor<Polygon> filledGapsPu2 = pu2ContainedInAoi.FillGaps(pu2OverlapsAoi.Execute(), polygonsOverlappingAoi.Execute(),
-					provider.GetRequiredService<ILogger<Processor>>());
-				pu2Polygons = filledGapsPu2.Execute();
+				// Fill the gaps of PU2 with border polygons that have not been shared with PU1 AND are not part of PU1 already
+				IProcessor<Polygon> pu2WithFilledGaps = pu2ContainedInAoi.FillGaps(pu2OverlapsAoi.Execute(),
+					polygonsOverlappingAoi.Merge(pu1OverlapsAoi.Execute()).Execute(), provider.GetRequiredService<ILogger<Processor>>());
+				pu2Polygons = pu2WithFilledGaps.Execute();
 			}
 
 			// Export output PU1 and PU2

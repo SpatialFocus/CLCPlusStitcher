@@ -14,8 +14,8 @@
 		<PackageReference Include="Serilog.Sinks.Console" Version="4.0.0" />
 		<PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
 		<PackageReference Include="Serilog.Settings.Configuration" Version="3.2.0" />
-    <PackageReference Include="SpatialFocus.GeoPackage" Version="1.0.0-alpha4" />
-    <PackageReference Include="SpatialFocus.GeoToolbox" Version="1.0.0-alpha4" />
+    <PackageReference Include="SpatialFocus.GeoPackage" Version="1.0.0-alpha5" />
+    <PackageReference Include="SpatialFocus.GeoToolbox" Version="1.0.0-alpha5" />
   </ItemGroup>
 
   <ItemGroup>
