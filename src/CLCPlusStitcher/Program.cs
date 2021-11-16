@@ -91,7 +91,7 @@ namespace CLCPlusStitcher
 
 				int i = 0;
 
-				foreach (var pu1BorderPolygon in pu1BorderPolygons)
+				foreach (Polygon pu1BorderPolygon in pu1BorderPolygons)
 				{
 					Polygon? polygon = pu2BorderPolygons.FirstOrDefault(x => x.EqualsTopologically(pu1BorderPolygon));
 
@@ -117,7 +117,7 @@ namespace CLCPlusStitcher
 
 				IProcessor<LineString> mergedLines = pu1Lines.SnapTo(pu2Lines.Execute(), 0.001)
 					.Merge(pu2Lines.Execute())
-					.Node(precisionModel)
+					.Node()
 					.Union(provider.GetRequiredService<ILogger<Processor>>());
 
 				// Construct polygons that are shared between PU1 and PU2
