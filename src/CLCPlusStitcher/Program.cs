@@ -140,8 +140,8 @@ namespace CLCPlusStitcher
 			// Export output PU1 and PU2
 			Input pu1Output = pu1Section.GetSection("Output").Get<Input>();
 			Input pu2Output = pu2Section.GetSection("Output").Get<Input>();
-			Task? task3 = Task.Run(() => pu1Polygons.Save(pu1Output.FileName, precisionModel, layerName: pu1Output.LayerName));
-			Task? task4 = Task.Run(() => pu2Polygons.Save(pu2Output.FileName, precisionModel, layerName: pu2Output.LayerName));
+			Task? task3 = Task.Run(() => pu1Polygons.Save(pu1Output.FileName, precisionModel, layerName: pu1Output.LayerName, puName: pu1Section["Name"]));
+			Task? task4 = Task.Run(() => pu2Polygons.Save(pu2Output.FileName, precisionModel, layerName: pu2Output.LayerName, puName: pu2Section["Name"]));
 
 			await Task.WhenAll(task3, task4);
 
