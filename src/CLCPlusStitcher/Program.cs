@@ -73,21 +73,21 @@ namespace CLCPlusStitcher
 
 			if (bool.Parse(config["CompareTopologicalEquality"]))
 			{
-				Task<ICollection<Polygon>>? task5 = Task.Run(() => pu1Processor.Execute());
-				Task<ICollection<Polygon>>? task6 = Task.Run(() => pu2Processor.Execute());
+				Task<ICollection<Polygon>> task11 = Task.Run(() => pu1Processor.Execute());
+				Task<ICollection<Polygon>> task12 = Task.Run(() => pu2Processor.Execute());
 
-				await Task.WhenAll(task5, task6);
+				await Task.WhenAll(task11, task12);
 
-				pu1Polygons = task5.Result;
-				pu2Polygons = task6.Result;
+				pu1Polygons = task11.Result;
+				pu2Polygons = task12.Result;
 
-				Task<ICollection<Polygon>>? task1 = Task.Run(() => pu1Processor.Overlap(pu1Aoi).Execute());
-				Task<ICollection<Polygon>>? task2 = Task.Run(() => pu2Processor.Overlap(pu2Aoi).Execute());
+				Task<ICollection<Polygon>> task21 = Task.Run(() => pu1Processor.Overlap(pu1Aoi).Execute());
+				Task<ICollection<Polygon>> task22 = Task.Run(() => pu2Processor.Overlap(pu2Aoi).Execute());
 
-				await Task.WhenAll(task1, task2);
+				await Task.WhenAll(task21, task22);
 
-				ICollection<Polygon> pu1BorderPolygons = task1.Result;
-				ICollection<Polygon> pu2BorderPolygons = task2.Result;
+				ICollection<Polygon> pu1BorderPolygons = task21.Result;
+				ICollection<Polygon> pu2BorderPolygons = task22.Result;
 
 				int i = 0;
 
@@ -106,19 +106,37 @@ namespace CLCPlusStitcher
 			}
 			else
 			{
+				Task<ICollection<Polygon>> task1 = Task.Run(() => pu1Processor.Execute());
+				Task<ICollection<Polygon>> task2 = Task.Run(() => pu2Processor.Execute());
+
+				await Task.WhenAll(task1, task2);
+
 				IProcessor<Polygon> pu1ContainedInAoi = pu1Processor.Contains(pu1Aoi);
 				IProcessor<Polygon> pu2ContainedInAoi = pu2Processor.Contains(pu2Aoi);
 
 				IProcessor<Polygon> pu1OverlapsAoi = pu1Processor.Overlap(pu1Aoi);
 				IProcessor<Polygon> pu2OverlapsAoi = pu2Processor.Overlap(pu2Aoi);
 
-				IProcessor<LineString> pu1Lines = pu1OverlapsAoi.PolygonsToLines().Clip(pu1Aoi.Buffer(0.0001)).Dissolve();
-				IProcessor<LineString> pu2Lines = pu2OverlapsAoi.PolygonsToLines().Clip(pu2Aoi.Buffer(0.0001)).Dissolve();
+				IProcessor<LineString> pu1Lines = pu1OverlapsAoi.PolygonsToLines()
+					.Clip(pu1Aoi.Buffer(0.0001))
+					.Dissolve()
+					.CountTooPrecise(precisionModel, provider.GetRequiredService<ILogger<Processor>>());
+				IProcessor<LineString> pu2Lines = pu2OverlapsAoi.PolygonsToLines()
+					.Clip(pu2Aoi.Buffer(0.0001))
+					.Dissolve()
+					.CountTooPrecise(precisionModel, provider.GetRequiredService<ILogger<Processor>>());
 
-				IProcessor<LineString> mergedLines = pu1Lines.SnapTo(pu2Lines.Execute(), 0.001)
+				Task<ICollection<LineString>> task3 = Task.Run(() => pu1Lines.Execute());
+				Task<ICollection<LineString>> task4 = Task.Run(() => pu2Lines.Execute());
+
+				await Task.WhenAll(task3, task4);
+
+				IProcessor<LineString> mergedLines = pu1Lines.SnapTo(pu2Lines.Execute(), precisionModel, 0.001)
 					.Merge(pu2Lines.Execute())
-					.Node()
-					.Union(provider.GetRequiredService<ILogger<Processor>>());
+					.CountTooPrecise(precisionModel, provider.GetRequiredService<ILogger<Processor>>())
+					.Node(precisionModel)
+					.Union(provider.GetRequiredService<ILogger<Processor>>())
+					.CountTooPrecise(precisionModel, provider.GetRequiredService<ILogger<Processor>>());
 
 				// Construct polygons that are shared between PU1 and PU2
 				IProcessor<Polygon> polygonsOverlappingAoi = mergedLines.Polygonize().Overlap(pu1Aoi);
@@ -140,12 +158,17 @@ namespace CLCPlusStitcher
 			// Export output PU1 and PU2
 			Input pu1Output = pu1Section.GetSection("Output").Get<Input>();
 			Input pu2Output = pu2Section.GetSection("Output").Get<Input>();
-			Task? task3 = Task.Run(() => pu1Polygons.Save(pu1Output.FileName, precisionModel, layerName: pu1Output.LayerName, puName: pu1Section["Name"]));
-			Task? task4 = Task.Run(() => pu2Polygons.Save(pu2Output.FileName, precisionModel, layerName: pu2Output.LayerName, puName: pu2Section["Name"]));
+			Task task5 = Task.Run(() =>
+				pu1Polygons.Save(pu1Output.FileName, precisionModel, layerName: pu1Output.LayerName, puName: pu1Section["Name"]));
+			Task task6 = Task.Run(() =>
+				pu2Polygons.Save(pu2Output.FileName, precisionModel, layerName: pu2Output.LayerName, puName: pu2Section["Name"]));
 
-			await Task.WhenAll(task3, task4);
+			await Task.WhenAll(task5, task6);
 
-			logger.LogInformation("Saved PU outputs");
+			logger.LogInformation("PU1 [{DataName}] result saved [{ExportFileName}]: {Count} geometries written", pu1Section["Name"],
+				pu1Output.FileName, pu1Polygons.Count);
+			logger.LogInformation("PU2 [{DataName}] result saved [{ExportFileName}]: {Count} geometries written", pu2Section["Name"],
+				pu2Output.FileName, pu2Polygons.Count);
 
 			stopwatch.Stop();
 			logger.LogInformation("Workflow finished in {Time}ms", stopwatch.ElapsedMilliseconds);

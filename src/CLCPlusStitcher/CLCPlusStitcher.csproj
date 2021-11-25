@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -15,7 +15,7 @@
 		<PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
 		<PackageReference Include="Serilog.Settings.Configuration" Version="3.2.0" />
     <PackageReference Include="SpatialFocus.GeoPackage" Version="1.0.0-alpha7" />
-    <PackageReference Include="SpatialFocus.GeoToolbox" Version="1.0.0-alpha7" />
+    <PackageReference Include="SpatialFocus.GeoToolbox" Version="1.0.0-alpha8" />
   </ItemGroup>
 
   <ItemGroup>
