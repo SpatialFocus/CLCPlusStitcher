@@ -114,15 +114,21 @@ namespace CLCPlusStitcher
 				IProcessor<Polygon> pu1ContainedInAoi = pu1Processor.Contains(pu1Aoi);
 				IProcessor<Polygon> pu2ContainedInAoi = pu2Processor.Contains(pu2Aoi);
 
+				pu1ContainedInAoi.Execute().Save("data\\temp\\10_pu1ContainedInAoi.gpkg", precisionModel);
+				pu2ContainedInAoi.Execute().Save("data\\temp\\10_pu2ContainedInAoi.gpkg", precisionModel);
+
 				IProcessor<Polygon> pu1OverlapsAoi = pu1Processor.Overlap(pu1Aoi);
 				IProcessor<Polygon> pu2OverlapsAoi = pu2Processor.Overlap(pu2Aoi);
 
+				pu1OverlapsAoi.Execute().Save("data\\temp\\20_pu1OverlapsAoi.gpkg", precisionModel);
+				pu2OverlapsAoi.Execute().Save("data\\temp\\20_pu2OverlapsAoi.gpkg", precisionModel);
+
 				IProcessor<LineString> pu1Lines = pu1OverlapsAoi.PolygonsToLines()
-					.Clip(pu1Aoi.Buffer(0.0001))
+					.Clip(pu1Aoi/*.Buffer(0.0001)*/)
 					.Dissolve()
 					.CountTooPrecise(precisionModel, provider.GetRequiredService<ILogger<Processor>>());
 				IProcessor<LineString> pu2Lines = pu2OverlapsAoi.PolygonsToLines()
-					.Clip(pu2Aoi.Buffer(0.0001))
+					.Clip(pu2Aoi/*.Buffer(0.0001)*/)
 					.Dissolve()
 					.CountTooPrecise(precisionModel, provider.GetRequiredService<ILogger<Processor>>());
 
@@ -131,6 +137,9 @@ namespace CLCPlusStitcher
 
 				await Task.WhenAll(task3, task4);
 
+				pu1Lines.Execute().Save("data\\temp\\30_pu1Lines.shp", precisionModel);
+				pu2Lines.Execute().Save("data\\temp\\30_pu2Lines.shp", precisionModel);
+
 				IProcessor<LineString> mergedLines = pu1Lines.SnapTo(pu2Lines.Execute(), precisionModel, 0.001)
 					.Merge(pu2Lines.Execute())
 					.CountTooPrecise(precisionModel, provider.GetRequiredService<ILogger<Processor>>())
@@ -138,8 +147,12 @@ namespace CLCPlusStitcher
 					.Union(provider.GetRequiredService<ILogger<Processor>>())
 					.CountTooPrecise(precisionModel, provider.GetRequiredService<ILogger<Processor>>());
 
+				mergedLines.Execute().Save("data\\temp\\40_mergedLines.shp", precisionModel);
+
 				// Construct polygons that are shared between PU1 and PU2
 				IProcessor<Polygon> polygonsOverlappingAoi = mergedLines.Polygonize().Overlap(pu1Aoi);
+
+				polygonsOverlappingAoi.Execute().Save("data\\temp\\50_polygonsOverlappingAoi.gpkg", precisionModel);
 
 				// Merge them into PU1
 				IProcessor<Polygon> pu1Merge = pu1ContainedInAoi.Merge(polygonsOverlappingAoi.Execute());
