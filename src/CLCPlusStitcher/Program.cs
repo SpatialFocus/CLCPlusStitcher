@@ -124,11 +124,11 @@ namespace CLCPlusStitcher
 				pu2OverlapsAoi.Execute().Save("data\\temp\\20_pu2OverlapsAoi.gpkg", precisionModel);
 
 				IProcessor<LineString> pu1Lines = pu1OverlapsAoi.PolygonsToLines()
-					.Clip(pu1Aoi/*.Buffer(0.0001)*/)
+					.Clip(pu1Aoi.Buffer(0.0001))
 					.Dissolve()
 					.CountTooPrecise(precisionModel, provider.GetRequiredService<ILogger<Processor>>());
 				IProcessor<LineString> pu2Lines = pu2OverlapsAoi.PolygonsToLines()
-					.Clip(pu2Aoi/*.Buffer(0.0001)*/)
+					.Clip(pu2Aoi.Buffer(0.0001))
 					.Dissolve()
 					.CountTooPrecise(precisionModel, provider.GetRequiredService<ILogger<Processor>>());
 
@@ -155,7 +155,8 @@ namespace CLCPlusStitcher
 				polygonsOverlappingAoi.Execute().Save("data\\temp\\50_polygonsOverlappingAoi.gpkg", precisionModel);
 
 				// Merge them into PU1
-				IProcessor<Polygon> pu1Merge = pu1ContainedInAoi.Merge(polygonsOverlappingAoi.Execute());
+				IProcessor<Polygon> pu1Merge = pu1ContainedInAoi.FillGaps(polygonsOverlappingAoi.Execute(), pu1ContainedInAoi.Execute(),
+					provider.GetRequiredService<ILogger<Processor>>());
 
 				// Fill the gaps of PU1 with border polygons that have not been shared with PU2
 				IProcessor<Polygon> pu1WithFilledGaps = pu1Merge.FillGaps(pu1OverlapsAoi.Execute(), polygonsOverlappingAoi.Execute(),
