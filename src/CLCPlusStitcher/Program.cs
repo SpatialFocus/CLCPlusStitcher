@@ -142,7 +142,8 @@ namespace CLCPlusStitcher
 				IProcessor<Polygon> polygonsOverlappingAoi = mergedLines.Polygonize().Overlap(pu1Aoi);
 
 				// Merge them into PU1
-				IProcessor<Polygon> pu1Merge = pu1ContainedInAoi.Merge(polygonsOverlappingAoi.Execute());
+				IProcessor<Polygon> pu1Merge = pu1ContainedInAoi.FillGaps(polygonsOverlappingAoi.Execute(), pu1ContainedInAoi.Execute(),
+					provider.GetRequiredService<ILogger<Processor>>());
 
 				// Fill the gaps of PU1 with border polygons that have not been shared with PU2
 				IProcessor<Polygon> pu1WithFilledGaps = pu1Merge.FillGaps(pu1OverlapsAoi.Execute(), polygonsOverlappingAoi.Execute(),
