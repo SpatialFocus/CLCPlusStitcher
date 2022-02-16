@@ -52,6 +52,11 @@ namespace CLCPlusStitcher
 				.Buffer(0)
 				.Execute()
 				.ToArray());
+			MultiPolygon pu1AoiBuffered = new(provider.LoadFromFile<Polygon>(pu1Section.GetSection("AOI").Get<Input>(), precisionModel)
+				.Buffer(0.001)
+				.Execute()
+				.ToArray());
+
 			IProcessor<Polygon> pu1Processor = provider.LoadFromFile<Polygon>(pu1Input, precisionModel,
 					provider.GetRequiredService<ILogger<Processor>>())
 				.Buffer(0)
@@ -64,6 +69,11 @@ namespace CLCPlusStitcher
 				.Buffer(0)
 				.Execute()
 				.ToArray());
+			MultiPolygon pu2AoiBuffered = new(provider.LoadFromFile<Polygon>(pu2Section.GetSection("AOI").Get<Input>(), precisionModel)
+				.Buffer(0.001)
+				.Execute()
+				.ToArray());
+
 			IProcessor<Polygon> pu2Processor = provider.LoadFromFile<Polygon>(pu2Input, precisionModel,
 					provider.GetRequiredService<ILogger<Processor>>())
 				.Buffer(0)
@@ -111,11 +121,13 @@ namespace CLCPlusStitcher
 
 				await Task.WhenAll(task1, task2);
 
-				IProcessor<Polygon> pu1ContainedInAoi = pu1Processor.Contains(pu1Aoi);
-				IProcessor<Polygon> pu2ContainedInAoi = pu2Processor.Contains(pu2Aoi);
+				IProcessor<Polygon> pu1ContainedInAoi = pu1Processor.Contains(pu1AoiBuffered);
+				IProcessor<Polygon> pu2ContainedInAoi = pu2Processor.Contains(pu2AoiBuffered);
 
-				IProcessor<Polygon> pu1OverlapsAoi = pu1Processor.Overlap(pu1Aoi);
-				IProcessor<Polygon> pu2OverlapsAoi = pu2Processor.Overlap(pu2Aoi);
+				IProcessor<Polygon> pu1OverlapsAoi =
+					pu1Processor.Overlap(pu1Aoi).RemoveInsignificantOverlappingPolygons(pu1Aoi, pu2Aoi, 0.1);
+				IProcessor<Polygon> pu2OverlapsAoi =
+					pu2Processor.Overlap(pu2Aoi).RemoveInsignificantOverlappingPolygons(pu1Aoi, pu2Aoi, 0.1);
 
 				IProcessor<LineString> pu1Lines = pu1OverlapsAoi.PolygonsToLines()
 					.Clip(pu1Aoi.Buffer(0.0001))
