@@ -5,6 +5,9 @@ There are two methods implemented for merging adjacent.
 The simplified method simply compares the two polygons left and right of the PU border for topologically equality.
 The advanced method breaks up the polygons left and right of the PU border and merges the two parts together.
 
+[![Build and Create Release](https://github.com/SpatialFocus/CLCPlusStitcher/actions/workflows/create-release.yml/badge.svg)](https://github.com/SpatialFocus/CLCPlusStitcher/actions/workflows/create-release.yml)
+[![FOSSA Status](https://app.fossa.com/api/projects/custom%2B19685%2Fgithub.com%2FSpatialFocus%2FCLCPlusStitcher.svg?type=shield)](https://app.fossa.com/projects/custom%2B19685%2Fgithub.com%2FSpatialFocus%2FCLCPlusStitcher?ref=badge_shield)
+
 ## How to create a new release
 
 ```
